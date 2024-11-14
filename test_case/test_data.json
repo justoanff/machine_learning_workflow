@@ -1,0 +1,22 @@
+[
+    {
+        "input": "What is machine learning?",
+        "expected": "Machine learning is a branch of artificial intelligence that focuses on the development of algorithms and statistical models that enable computer systems to improve their performance on a specific task through experience, without being explicitly programmed."
+    },
+    {
+        "input": "Explain quantum computing",
+        "expected": "Quantum computing is a type of computation that harnesses the unique properties of quantum mechanics, such as superposition and entanglement, to perform complex calculations. Unlike classical computers that use bits, quantum computers use quantum bits or qubits, which can exist in multiple states simultaneously, potentially solving certain problems much faster than traditional computers."
+    },
+    {
+        "input": "Describe the process of photosynthesis",
+        "expected": "Photosynthesis is the process by which plants and other organisms convert light energy into chemical energy. It involves capturing sunlight using chlorophyll, splitting water molecules to release oxygen, and using carbon dioxide from the air to produce glucose. This process is crucial for life on Earth as it produces oxygen and serves as the basis of most food chains."
+    },
+    {
+        "input": "What are the main principles of object-oriented programming?",
+        "expected": "The main principles of object-oriented programming (OOP) are: 1) Encapsulation: bundling data and methods that operate on that data within a single unit or object. 2) Inheritance: allowing new objects to take on the properties of existing objects. 3) Polymorphism: the ability of objects to take on multiple forms. 4) Abstraction: hiding complex implementation details and showing only the necessary features of an object."
+    },
+    {
+        "input": "Explain the concept of climate change",
+        "expected": "Climate change refers to long-term shifts in global weather patterns and average temperatures. It is primarily caused by human activities that release greenhouse gases into the atmosphere, such as burning fossil fuels and deforestation. These gases trap heat, leading to global warming, which results in various environmental impacts including rising sea levels, more frequent extreme weather events, and disruptions to ecosystems and biodiversity."
+    }
+]

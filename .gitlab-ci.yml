@@ -1,0 +1,172 @@
+# Định nghĩa các stage trong pipeline
+stages:
+  - setup
+  - commit
+  - finetune
+  - evaluate
+  - push
+  - deploy
+  - test
+
+# Định nghĩa các biến môi trường
+variables:
+  MODEL_NAME: "bert-base-uncased"
+  PRETRAINED_MODEL: "bert-base-uncased"
+  LEARNING_RATE: "2e-5"
+  BATCH_SIZE: "16"
+  NUM_EPOCHS: "3"
+  MAX_LENGTH: "128"
+  DATA_PATH: "${CI_PROJECT_DIR}/data"
+  OUTPUT_DIR: "${CI_PROJECT_DIR}/models"
+  CUDA_VISIBLE_DEVICES: "0"  # GPU configuration
+  PYTHONPATH: "${CI_PROJECT_DIR}"
+
+# Cache configuration
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - ~/.cache/pip
+    - ~/.cache/huggingface
+    - venv/
+    - .pytest_cache/
+
+# Template cho việc setup Python environment
+.python-setup: &python-setup
+  before_script:
+    - python -V
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install --upgrade pip
+    - pip install -r requirements.txt
+
+# Setup stage
+setup:
+  stage: setup
+  image: python:3.8
+  <<: *python-setup
+  script:
+    - python -c "import torch; print(f'PyTorch version: {torch.__version__}')"
+    - python -c "import transformers; print(f'Transformers version: {transformers.__version__}')"
+  artifacts:
+    paths:
+      - venv/
+
+# Commit stage - Pull và verify model
+commit:
+  stage: commit
+  image: python:3.8
+  needs: ["setup"]
+  <<: *python-setup
+  script:
+    - python scripts/pull_model.py 
+      --model_name ${MODEL_NAME}
+      --output_dir ${OUTPUT_DIR}/base
+  artifacts:
+    paths:
+      - ${OUTPUT_DIR}/base/
+    expire_in: 1 week
+
+# Fine-tuning stage
+finetune:
+  stage: finetune
+  image: python:3.8
+  needs: ["commit"]
+  <<: *python-setup
+  script:
+    - python scripts/finetune.py
+      --model_name ${MODEL_NAME}
+      --pretrained_model ${PRETRAINED_MODEL}
+      --learning_rate ${LEARNING_RATE}
+      --batch_size ${BATCH_SIZE}
+      --num_epochs ${NUM_EPOCHS}
+      --max_length ${MAX_LENGTH}
+      --data_path ${DATA_PATH}
+      --output_dir ${OUTPUT_DIR}/finetuned
+  artifacts:
+    paths:
+      - ${OUTPUT_DIR}/finetuned/
+      - metrics/training_metrics.json
+    reports:
+      metrics: metrics/training_metrics.json
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: always
+
+# Evaluation stage
+evaluate:
+  stage: evaluate
+  image: python:3.8
+  needs: ["finetune"]
+  <<: *python-setup
+  script:
+    - python scripts/evaluate.py
+      --model_path ${OUTPUT_DIR}/finetuned
+      --test_data_path ${DATA_PATH}/test
+      --output_dir metrics/
+  artifacts:
+    paths:
+      - metrics/evaluation_results.json
+    reports:
+      metrics: metrics/evaluation_results.json
+
+# Push stage
+push:
+  stage: push
+  image: python:3.8
+  needs: ["evaluate"]
+  <<: *python-setup
+  script:
+    - python scripts/push_model.py
+      --model_path ${OUTPUT_DIR}/finetuned
+      --model_name "${MODEL_NAME}_finetuned"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: always
+    - when: never
+
+# Deploy stage
+deploy:
+  stage: deploy
+  image: python:3.8
+  needs: ["push"]
+  <<: *python-setup
+  script:
+    - python scripts/deploy_model.py
+      --model_name "${MODEL_NAME}_finetuned"
+      --deployment_env production
+  environment:
+    name: production
+  when: manual
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+    - when: never
+
+# Test stage
+test:
+  stage: test
+  image: python:3.8
+  needs: ["deploy"]
+  <<: *python-setup
+  script:
+    - python scripts/test_model.py
+      --model_name "${MODEL_NAME}_finetuned"
+      --test_data_path ${DATA_PATH}/test
+      --output_dir test_results/
+  artifacts:
+    paths:
+      - test_results/
+    reports:
+      junit: test_results/junit.xml
+      metrics: test_results/test_metrics.json
+  coverage: '/Code coverage: \d+\.\d+/'
+
+# Cleanup job
+cleanup:
+  stage: .post
+  script:
+    - rm -rf ${OUTPUT_DIR}/base
+    - rm -rf ${OUTPUT_DIR}/finetuned
+  when: always
